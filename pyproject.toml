@@ -3,9 +3,9 @@ requires = ["setuptools==75.6.0", "wheel==0.45.1"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "visual-slam-3d-reconstruction"
-version = "0.1.0"
-description = "Educational monocular visual odometry on the TUM RGB-D benchmark"
+name = "visual-odometry-driving"
+version = "0.2.0"
+description = "Stereo visual odometry and sparse mapping for autonomous-driving perception"
 readme = "README.md"
 requires-python = ">=3.10,<3.13"
 license = {text = "MIT"}
