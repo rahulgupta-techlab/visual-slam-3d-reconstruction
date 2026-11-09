@@ -1,68 +1,117 @@
-# Visual SLAM & 3D Reconstruction
+# visual-odometry-driving
 
-An educational monocular visual-odometry project built with Python, OpenCV and NumPy. It detects and matches ORB features, estimates two-view geometry with an essential matrix and RANSAC, recovers relative camera motion, and integrates a trajectory on the TUM RGB-D `fr1/xyz` and `fr1/desk` sequences.
+This project estimates vehicle ego-motion and a sparse 3D map from camera images. It is designed as a perception and localization module for my autonomous-driving work in [predictive-world-model-driving](https://github.com/rahulgupta-techlab/predictive-world-model-driving), which consumes an ego-motion estimate as an input to its predictive world-model and planning pipeline.
 
-**Project timeline:** Started in May 2025. The current public implementation baseline is being published in November 2026. Git commit dates reflect the actual publication and update history; they are not backdated.
+The primary benchmark is the **KITTI Odometry dataset**, using rectified stereo image pairs from sequences 00–02. Stereo disparity provides metric depth and metric translation estimates; sparse feature correspondences are tracked between consecutive left-camera frames. TUM RGB-D remains available as an automatically downloadable monocular fallback baseline.
 
-The visual-odometry geometry and trajectory integration are implemented in this repository; feature extraction/matching, essential-matrix estimation and pose recovery use OpenCV. Evaluation is intended to use `evo`. Monocular translation is recovered only up to an unknown scale: the estimator does **not** consume ground-truth poses or use ground-truth scale. For evaluation, `evo` performs a single global Sim(3) scale alignment, which must be disclosed alongside metrics.
+## Project status
 
-## Pipeline
+- [x] Existing ORB feature extraction, matching, essential-matrix pose estimation and monocular trajectory integration retained.
+- [x] KITTI odometry sequence loader for sequences 00–02.
+- [x] Stereo depth from rectified KITTI image pairs and metric PnP motion estimation.
+- [x] Sparse point-cloud export (PLY) and ego-motion CSV export.
+- [x] TUM RGB-D automatic fallback loader and monocular VO path retained.
+- [ ] KITTI sequences 00–02 benchmark runs and evo metrics: **Not run yet** — KITTI files and ground-truth pose files must be downloaded locally first.
+- [ ] TUM fallback benchmark and evo metrics: **Not run yet** — not executed in the current environment.
+- [ ] Dense reconstruction, loop closure and global bundle adjustment: **Not implemented**.
 
-```mermaid
-flowchart TD
-  A[TUM RGB frames] --> B[ORB keypoints and descriptors]
-  B --> C[Hamming KNN matching + ratio test]
-  C --> D[Essential matrix with RANSAC]
-  D --> E[recoverPose: R and unit t direction]
-  E --> F[Trajectory integration]
-  F --> G[TUM trajectory file]
-  G --> H[evo ATE / RPE with global scale alignment]
-```
+## Datasets
 
-## Status
+### Primary: KITTI Odometry (manual download)
 
-- [x] Monocular ORB visual odometry and TUM-format trajectory export.
-- [x] Synthetic unit tests for descriptor matching, essential-matrix pose recovery and trajectory accumulation.
-- [ ] TUM dataset runs and measured results: **Not run yet** in the publication environment.
-- [ ] `evo` ATE/RPE metrics and plots: **Not run yet**.
-- [ ] RGB-D depth-based scale upgrade: **Not implemented**.
-- [ ] COLMAP / Gaussian splatting: **Not implemented**.
+Download the following from the [KITTI Vision Benchmark Suite – Odometry](https://www.cvlibs.net/datasets/kitti/eval_odometry.php):
 
-## Quick start
+1. **Odometry data set (grayscale, 22 GB)** — extract so that sequence folders are under data/kitti/sequences/.
+2. **Odometry ground truth poses (4 MB)** — extract so that pose files are under data/kitti/poses/.
 
-Python 3.10–3.12 is supported by the pinned project dependencies.
+Expected layout:
 
-```bash
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\\Scripts\\activate
-python -m pip install -e '.[dev]'
-bash scripts/download_data.sh
-python scripts/run_vo.py --seq fr1_xyz
-python scripts/evaluate.py --seq fr1_xyz
-```
+    data/kitti/
+    ├── sequences/
+    │   ├── 00/
+    │   │   ├── image_0/
+    │   │   ├── image_1/
+    │   │   ├── calib.txt
+    │   │   └── times.txt
+    │   ├── 01/
+    │   ├── 02/
+    │   └── ...
+    └── poses/
+        ├── 00.txt
+        ├── 01.txt
+        └── 02.txt
 
-To run the second sequence, use `--seq fr1_desk` for both commands. Dataset files are downloaded directly from the TUM RGB-D benchmark and are not committed.
+The loader reads grayscale stereo pairs, calibration and timestamps from the local sequence directory. It does not download KITTI automatically because the dataset requires manual acceptance of its terms.
 
-## Evaluation and scale
+### Fallback: TUM RGB-D (automatic download)
 
-The monocular estimator returns unit translation directions. Absolute translation scale is fundamentally unobservable from a monocular image pair. The benchmark protocol uses a **single global Sim(3) scale alignment during evaluation** with `evo`; no ground-truth scale is injected into the VO pipeline. This makes the reported ATE/RPE scale-aligned evaluation results, not metric-scale odometry. Metrics and plots will only be added after the scripts have actually run successfully.
+If KITTI is not available, download the two TUM RGB-D Freiburg 1 sequences:
+
+    bash scripts/download_data.sh
+
+The fallback uses the retained monocular ORB/essential-matrix implementation. Its translation scale is arbitrary; it is **not** metric-scale odometry.
+
+## Installation
+
+Python 3.10–3.12:
+
+    python -m venv .venv
+    source .venv/bin/activate  # Windows: .venv\Scripts\activate
+    python -m pip install -e '.[dev]'
+
+## Run KITTI stereo visual odometry
+
+    python scripts/run_vo.py --dataset kitti --seq 00 --data-root data/kitti
+
+Available sequences: 00, 01, 02. The run writes:
+
+- results/kitti_00_ego_motion.csv — timestamp,x,y,z,yaw in the world frame.
+- results/kitti_00_trajectory.tum — TUM trajectory format for evo.
+- results/kitti_00_sparse_map.ply — accumulated sparse 3D landmarks in the world frame.
+
+Run the evaluation after generating the trajectory:
+
+    python scripts/evaluate.py --dataset kitti --seq 00 --data-root data/kitti
+
+KITTI ground truth is expected at data/kitti/poses/00.txt. Evaluation uses the sequence ground-truth poses and the generated trajectory. The code does not manufacture missing metrics: if data, trajectories or dependencies are absent, the result is recorded as **Not run yet** with the reason.
+
+## Run the TUM fallback
+
+    python scripts/run_vo.py --dataset tum --seq fr1_xyz
+    python scripts/evaluate.py --dataset tum --seq fr1_xyz
+
+Use fr1_desk for the second fallback sequence. TUM runs export the same ego-motion CSV interface, but estimated translation is up to arbitrary monocular scale.
+
+## How this connects to predictive-world-model-driving
+
+[visual-odometry-driving](https://github.com/rahulgupta-techlab/visual-odometry-driving) is responsible for estimating camera ego-motion and producing a sparse geometric map from stereo images. It exports a stable per-frame CSV with timestamp, world-frame position (x, y, z) and heading (yaw).
+
+[predictive-world-model-driving](https://github.com/rahulgupta-techlab/predictive-world-model-driving) can consume this CSV as its ego-motion input rather than estimating vehicle motion internally. Keep timestamps in seconds and ensure both projects use the same coordinate-frame convention before combining trajectories, object tracks or predicted future states. The CSV export uses KITTI camera/world coordinates as defined by the odometry pose integration; axis conversion, if needed by the integration, should be explicit at the boundary.
+
+## Method
+
+1. Detect ORB features in consecutive left-camera frames.
+2. Match descriptors using Hamming KNN and Lowe's ratio test.
+3. Compute stereo disparity with Semi-Global Block Matching.
+4. Back-project matched previous-frame pixels into 3D using the calibrated stereo baseline.
+5. Estimate metric camera motion with RANSAC PnP from previous-frame 3D points to current-frame 2D observations.
+6. Integrate camera poses and transform sampled stereo landmarks into the world frame.
+7. Export ego-motion CSV, TUM trajectory and PLY point cloud.
+
+The monocular TUM fallback continues to use an essential matrix and recoverPose, with unit translation direction and scale-aligned evo evaluation only.
+
+## Evaluation policy
+
+All reported values must come from a completed run of the checked-in code on the named dataset. KITTI ATE/RPE metrics and plots are **Not run yet** until the local KITTI sequences and ground-truth poses are present. No benchmark scores are inferred from synthetic unit tests. See results/metrics.md for the current run status.
 
 ## Limitations
 
-- Monocular scale ambiguity and accumulated scale drift.
-- No loop closure, global bundle adjustment, local mapping or relocalisation.
-- No robust keyframe selection or motion-model initialisation yet.
-- ORB matching and two-view geometry can fail under low texture, motion blur, dynamic objects and weak parallax.
-- This is an educational baseline, not a real-time or production SLAM system.
-
-## Next steps
-
-1. Run both TUM sequences and inspect tracking failures.
-2. Add depth-assisted scale estimation from TUM depth frames and compare against the monocular baseline.
-3. Add keyframes, local bundle adjustment and loop closure.
-4. Compare against ORB-SLAM3 or DROID-SLAM under matching evaluation protocols.
-5. Consider COLMAP and Gaussian splatting only after checking available GPU resources.
+- Stereo depth quality depends on calibration, texture, disparity range and occlusion.
+- Sparse ORB landmarks are not a dense reconstruction.
+- No loop closure, global bundle adjustment, relocalisation or dynamic-object filtering.
+- KITTI evaluation covers only the sequences actually downloaded and run.
+- The TUM fallback is monocular and therefore does not provide metric scale.
 
 ## License
 
-MIT. Dataset terms remain those of the TUM RGB-D benchmark.
+MIT. KITTI and TUM datasets remain subject to their respective terms of use.
