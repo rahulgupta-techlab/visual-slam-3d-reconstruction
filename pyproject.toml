@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools==75.6.0", "wheel==0.45.1"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "visual-slam-3d-reconstruction"
+version = "0.1.0"
+description = "Educational monocular visual odometry on the TUM RGB-D benchmark"
+readme = "README.md"
+requires-python = ">=3.10,<3.13"
+license = {text = "MIT"}
+authors = [{name = "Rahul Gupta"}]
+dependencies = [
+  "numpy==1.26.4",
+  "opencv-python-headless==4.10.0.84",
+  "matplotlib==3.9.2",
+  "evo==1.30.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest==8.3.4", "pytest-cov==6.0.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-ra"
