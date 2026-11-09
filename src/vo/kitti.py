@@ -73,7 +73,7 @@ def pixels_to_3d(points: np.ndarray, disparity: np.ndarray, K: np.ndarray, basel
     return xyz, valid
 
 
-def _sample_cloud(disparity: np.ndarray, K: np.ndarray, baseline: float, stride: int = 12) -> np.ndarray:
+def _sample_cloud(disparity: np.ndarray, K: np.ndarray, baseline: float, stride: int = 32) -> np.ndarray:
     h, w = disparity.shape
     yy, xx = np.mgrid[10:h:stride, 10:w:stride]
     coords = np.column_stack([xx.ravel(), yy.ravel()])
