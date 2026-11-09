@@ -136,9 +136,10 @@ def run_kitti_stereo_vo(sequence_dir: Path, output_prefix: Path, max_frames: int
 
     output_prefix.parent.mkdir(parents=True, exist_ok=True)
     tum_path = output_prefix.with_name(output_prefix.name + "_trajectory.tum")
+    kitti_path = output_prefix.with_name(output_prefix.name + "_trajectory.kitti")
     csv_path = output_prefix.with_name(output_prefix.name + "_ego_motion.csv")
     ply_path = output_prefix.with_name(output_prefix.name + "_sparse_map.ply")
-    with tum_path.open("w", encoding="utf-8") as f_tum, csv_path.open("w", newline="", encoding="utf-8") as f_csv:
+    with tum_path.open("w", encoding="utf-8") as f_tum, kitti_path.open("w", encoding="utf-8") as f_kitti, csv_path.open("w", newline="", encoding="utf-8") as f_csv:
         writer = csv.writer(f_csv)
         writer.writerow(["timestamp", "x", "y", "z", "yaw"])
         for timestamp, p in poses:
