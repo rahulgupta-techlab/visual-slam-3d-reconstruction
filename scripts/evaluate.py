@@ -12,7 +12,8 @@ from pathlib import Path
 def run_metric(command: list[str]) -> tuple[float, str]:
     completed = subprocess.run(command, check=True, text=True, capture_output=True)
     output = completed.stdout + "\n" + completed.stderr
-    match = re.search(r"rmse\s+([0-9.eE+-]+)\s*m", output, re.IGNORECASE)
+    # evo prints the statistics table as "      rmse\t0.148051" (no unit).
+    match = re.search(r"^\s*rmse\s+([0-9.eE+-]+)\s*$", output, re.IGNORECASE | re.MULTILINE)
     if not match:
         raise RuntimeError(f"Could not parse RMSE from evo output:\n{output}")
     return float(match.group(1)), output
@@ -26,11 +27,11 @@ def evaluate_kitti(sequence: str, data_root: Path) -> tuple[float, float]:
     if not estimate.exists():
         raise FileNotFoundError(f"Missing estimated trajectory: {estimate}; run scripts/run_vo.py --dataset kitti first")
     Path("docs").mkdir(exist_ok=True)
-    common = ["--align"]
+    common = ["--align", "--no_warnings"]
     ate, ate_log = run_metric(["evo_ape", "kitti", str(gt), str(estimate), *common,
-        "--plot", "--plot_mode", "xy", "--save_plot", f"docs/kitti_{sequence}_ate.png"])
+        "--plot_mode", "xy", "--save_plot", f"docs/kitti_{sequence}_ate.png"])
     rpe, rpe_log = run_metric(["evo_rpe", "kitti", str(gt), str(estimate), *common,
-        "--delta", "1", "--delta_unit", "f", "--plot", "--plot_mode", "xy",
+        "--delta", "1", "--delta_unit", "f", "--plot_mode", "xy",
         "--save_plot", f"docs/kitti_{sequence}_rpe.png"])
     Path("results").mkdir(exist_ok=True)
     Path(f"results/kitti_{sequence}_ate.log").write_text(ate_log, encoding="utf-8")
@@ -46,11 +47,11 @@ def evaluate_tum(sequence: str, data_root: Path) -> tuple[float, float]:
     if not estimate.exists():
         raise FileNotFoundError(f"Missing TUM estimate: {estimate}; run scripts/run_vo.py --dataset tum first")
     Path("docs").mkdir(exist_ok=True)
-    common = ["--align", "--correct_scale", "--t_max_diff", "0.02"]
+    common = ["--align", "--correct_scale", "--t_max_diff", "0.02", "--no_warnings"]
     ate, ate_log = run_metric(["evo_ape", "tum", str(gt), str(estimate), *common,
-        "--plot", "--plot_mode", "xy", "--save_plot", f"docs/{sequence}_ate.png"])
+        "--plot_mode", "xy", "--save_plot", f"docs/{sequence}_ate.png"])
     rpe, rpe_log = run_metric(["evo_rpe", "tum", str(gt), str(estimate), *common,
-        "--delta", "1", "--delta_unit", "f", "--plot", "--plot_mode", "xy",
+        "--delta", "1", "--delta_unit", "f", "--plot_mode", "xy",
         "--save_plot", f"docs/{sequence}_rpe.png"])
     Path("results").mkdir(exist_ok=True)
     Path(f"results/{sequence}_ate.log").write_text(ate_log, encoding="utf-8")
@@ -76,7 +77,8 @@ def main() -> None:
             rows.append((sequence, ate, rpe, "Completed"))
             print(f"{sequence}: ATE RMSE={ate:.6f} m, RPE RMSE={rpe:.6f} m")
         except (FileNotFoundError, subprocess.CalledProcessError, RuntimeError) as exc:
-            rows.append((sequence, None, None, f"Not run yet — {exc}"))
+            reason = str(exc).splitlines()[0] if str(exc) else type(exc).__name__
+            rows.append((sequence, None, None, f"Not run yet — {reason}"))
             print(f"{sequence}: Not run yet — {exc}")
     lines = ["# Visual odometry evaluation", "",
         f"Dataset: {'KITTI stereo (metric scale)' if is_kitti else 'TUM monocular fallback'}.",
@@ -86,8 +88,11 @@ def main() -> None:
     for seq, ate, rpe, status in rows:
         lines.append(f"| {seq} | {ate:.6f} | {rpe:.6f} | {status} |" if ate is not None and rpe is not None
                      else f"| {seq} | — | — | {status} |")
+    # One file per dataset, so evaluating TUM never overwrites KITTI results (and vice versa).
     Path("results").mkdir(exist_ok=True)
-    Path("results/metrics.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    output = Path("results") / f"metrics_{args.dataset}.md"
+    output.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"Wrote {output}")
 
 
 if __name__ == "__main__":
