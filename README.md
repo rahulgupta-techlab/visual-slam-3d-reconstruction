@@ -12,7 +12,7 @@ The primary benchmark is the **KITTI Odometry dataset**, using rectified stereo 
 - [x] Sparse point-cloud export (PLY) and ego-motion CSV export.
 - [x] TUM RGB-D automatic fallback loader and monocular VO path retained.
 - [ ] KITTI sequences 00–02 benchmark runs and evo metrics: **Not run yet** — KITTI files and ground-truth pose files must be downloaded locally first.
-- [ ] TUM fallback benchmark and evo metrics: **Not run yet** — not executed in the current environment.
+- [x] TUM fallback benchmark and evo metrics: fr1_xyz ATE RMSE 0.148 m, fr1_desk ATE RMSE 0.466 m after Sim(3) alignment — a weak monocular baseline; see [results/metrics.md](results/metrics.md) for plots and interpretation.
 - [ ] Dense reconstruction, loop closure and global bundle adjustment: **Not implemented**.
 
 ## Datasets
